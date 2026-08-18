@@ -1,0 +1,388 @@
+{
+  "name": "Lead Assignment",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Lead_Request",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "City",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "No. of leads",
+              "fieldType": "number",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -608,
+        224
+      ],
+      "id": "733b9aa0-ee8a-4009-a2a3-60729b930e5e",
+      "name": "On form submission",
+      "webhookId": "92efdbcc-a818-4558-817d-503111b73555"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1MHMnUw7KpP5gAqyFx-HmGcoR4xpXXxJCGD1FLiWseYs",
+          "mode": "list",
+          "cachedResultName": "Copy of Official Copy of Marble Factories Detials",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MHMnUw7KpP5gAqyFx-HmGcoR4xpXXxJCGD1FLiWseYs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Master_leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MHMnUw7KpP5gAqyFx-HmGcoR4xpXXxJCGD1FLiWseYs/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "status",
+              "lookupValue": "unassigned"
+            },
+            {
+              "lookupColumn": "Location",
+              "lookupValue": "={{ $json.City.toLowerCase() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -400,
+        224
+      ],
+      "id": "2e2eb725-886c-44a2-be4f-4338e20b5f47",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "aaPzvRnAITZqBSvX",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let leads = $input.all().map((item) => item.json);\n\nleads.sort(() => Math.random() - 0.5);\n\nlet limit = $(\"On form submission\").all()[0].json[\"No. of leads\"];\n\nlet selectedLeads = leads.slice(0, limit);\n\nreturn selectedLeads.map((l) => ({ json: l }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        224
+      ],
+      "id": "2b50a807-c76a-4884-bcce-c6a7cf3e5007",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "23412058-e1fd-4c82-9d81-b1c2c64b29d8",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1MHMnUw7KpP5gAqyFx-HmGcoR4xpXXxJCGD1FLiWseYs",
+          "mode": "list",
+          "cachedResultName": "Copy of Official Copy of Marble Factories Detials",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MHMnUw7KpP5gAqyFx-HmGcoR4xpXXxJCGD1FLiWseYs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Master_leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1MHMnUw7KpP5gAqyFx-HmGcoR4xpXXxJCGD1FLiWseYs/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title": "={{ $json.title }}",
+            "phone": "={{ $json.phone }}",
+            "address": "={{ $json.address }}",
+            "url": "={{ $json.url }}",
+            "Location": "={{ $json.Location }}",
+            "website/ social media": "={{ $json['website/ social media'] }}",
+            "status": "Assigned",
+            "assigned_to": "={{ $node[\"On form submission\"].json.Name }}",
+            "assigned_date": "={{ $now }}",
+            "row_number": "={{ $json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "address",
+              "displayName": "address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Location",
+              "displayName": "Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "website/ social media",
+              "displayName": "website/ social media",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "assigned_to",
+              "displayName": "assigned_to",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "assigned_date",
+              "displayName": "assigned_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        240,
+        0
+      ],
+      "id": "ad5b6462-deea-4b95-ada5-7b6e0d2a0cbc",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "aaPzvRnAITZqBSvX",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $node[\"On form submission\"].json.Email }}\n",
+        "subject": "Subject: Your Assigned Leads Email",
+        "message": "={{ $node[\"Code in JavaScript1\"].json.email_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        256,
+        320
+      ],
+      "id": "6531f2fc-17ba-4698-b717-bd41ccfc1595",
+      "name": "Send a message",
+      "webhookId": "51012007-86a9-49aa-89e5-a95a9873c7f6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "owB1ZneihHpn12KW",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Safely check if items exist\nconst leads = items || [];\n\n// Safely access form data\nlet formName = \"Intern\";\ntry {\n  const formArray = $node[\"On form submission\"].all();\n  if (formArray && formArray.length > 0) {\n    formName = formArray[0].json.Name || \"Intern\";\n  }\n} catch (e) {\n  console.log(\"Form data not found\");\n}\n\nlet html = `<h3>Hi ${formName},</h3>\n<p>Your assigned leads are below. Please update the CRM after each call.</p>\n<table border=\"1\" cellpadding=\"8\" style=\"border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; max-width: 800px;\">\n    <tr style=\"background-color: #4CAF50; color: white;\">\n        <th>Company Name</th>\n        <th>Phone</th>\n        <th>Address</th>\n        <th>Location</th>\n        <th>Website</th>\n        <th>Status</th>\n    </tr>`;\n\nif (leads.length > 0) {\n  leads.forEach(lead => {\n    const l = lead.json || lead;\n    html += `<tr>\n      <td>${l.title || '-'}</td>\n      <td>${l.phone || '-'}</td>\n      <td>${l.address || '-'}</td>\n      <td>${l.Location || '-'}</td>\n      <td>${l.url ? `<a href=\"${l.url}\" target=\"_blank\">Link</a>` : '-'}</td>\n      <td>${l.status || '-'}</td>\n    </tr>`;\n  });\n}\n\nhtml += `</table><p>Best regards,<br>Operations Team</p>`;\n\nreturn [{ json: { email_body: html } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        304
+      ],
+      "id": "af6c43aa-715c-48e7-92df-efda4a2d706f",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "b7e31575-76e5-4e42-b2bb-4109c5c84e8c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7b306457276a81e33e9c2d7bd74063f36caaef0e7cf8611eee8b3332bb2dd71e"
+  },
+  "nodeGroups": [],
+  "id": "uquJpk7erFmi88BX",
+  "tags": []
+}

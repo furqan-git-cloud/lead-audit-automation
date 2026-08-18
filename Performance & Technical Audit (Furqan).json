@@ -1,0 +1,784 @@
+{
+  "name": "Performance & Technical Audit (Furqan)",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "\n// Read incoming lead (webhook body). Accept url or final_url.\nconst body = $input.first().json.body || $input.first().json || {};\nlet url = (body.final_url || body.url || body.website_url || body.website || '').toString().trim();\nconst leadId = body.lead_id || body.leadId || null;\nconst businessName = body.business_name || body.businessName || null;\n\n// URL normalization: ensure a scheme, default to https\nif (url && !/^https?:\\/\\//i.test(url)) {\n  url = 'https://' + url;\n}\n\n// Configurable thresholds & category weights (edit here — never hardcoded in the report node).\nconst config = {\n  thresholds: {\n    lcp_ms: 2500,          // Largest Contentful Paint target < 2.5s\n    cls: 0.1,              // Cumulative Layout Shift target < 0.1\n    tbt_ms: 200,           // Total Blocking Time target < 200ms\n    speed_index_ms: 3400,  // Speed Index target < 3.4s\n    fcp_ms: 1800,          // First Contentful Paint target < 1.8s\n    tti_ms: 3800,          // Time to Interactive target < 3.8s\n    total_byte_weight: 1600000, // Page weight target < ~1.6MB\n    request_count: 50,     // Requests target < 50\n  },\n  // Blend used to derive the single performance_score (mobile is weighted higher — mobile-first).\n  perf_blend: { mobile: 0.6, desktop: 0.4 },\n};\n\nreturn [{ json: { lead_id: leadId, business_name: businessName, url: url || null, valid_url: !!url, config } }];\n"
+      },
+      "id": "8da3cddb-40a5-4b4c-9f7e-da0df78aed09",
+      "name": "Prepare & Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/pagespeedonline/v5/runPagespeed?key=AIzaSyCPCYTyR1TXIFBeaw2UuwoUG6oVPRUnMF8",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $('Run Website Audit').item.json.final_url }}"
+            },
+            {
+              "name": "strategy",
+              "value": "mobile"
+            },
+            {
+              "name": "category",
+              "value": "performance"
+            },
+            {
+              "name": "category",
+              "value": "best-practices"
+            },
+            {
+              "name": "key",
+              "value": "AIzaSyB6L4LcBR7QjWGRUcWuDZNGeMR3wrCTIm0"
+            },
+            {
+              "name": "key 2",
+              "value": "AIzaSyCPCYTyR1TXIFBeaw2UuwoUG6oVPRUnMF8"
+            },
+            {
+              "name": "category",
+              "value": "accessibility"
+            },
+            {
+              "name": "category",
+              "value": "seo"
+            }
+          ]
+        },
+        "options": {
+          "queryParameterArrays": "repeat",
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "fe10610c-5a70-440b-bf54-7c2a701e63f7",
+      "name": "PSI Mobile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1536,
+        272
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "4006c218-97d8-46a6-b0c0-ab71d8074bb5",
+      "name": "Merge Strategies",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1760,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/pagespeedonline/v5/runPagespeed?key=AIzaSyCPCYTyR1TXIFBeaw2UuwoUG6oVPRUnMF8",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $('Run Website Audit').item.json.final_url }}"
+            },
+            {
+              "name": "strategy",
+              "value": "desktop"
+            },
+            {
+              "name": "category",
+              "value": "performance"
+            },
+            {
+              "name": "category",
+              "value": "best-practices"
+            },
+            {
+              "name": "key"
+            },
+            {
+              "name": "key 2",
+              "value": "AIzaSyCPCYTyR1TXIFBeaw2UuwoUG6oVPRUnMF8"
+            },
+            {
+              "name": "category",
+              "value": "accessibility"
+            },
+            {
+              "name": "category",
+              "value": "seo"
+            }
+          ]
+        },
+        "options": {
+          "queryParameterArrays": "repeat",
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "0aee98ae-cfac-4aea-8f68-7adf2ef19924",
+      "name": "PSI Desktop",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1536,
+        464
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const nowIso = new Date().toISOString();\n// Point to the Run Website Audit node\nconst prep = $('Run Website Audit').first().json;\nconst config = prep.config;\nconst t = config.thresholds;\n\nconst mobileRes = $('PSI Mobile').first().json || {};\nconst desktopRes = $('PSI Desktop').first().json || {};\n\n// ---- Audit-error detection ----\nfunction extractLH(res) {\n  if (res && res.lighthouseResult) return res.lighthouseResult;\n  return null;\n}\nconst lhMobile = extractLH(mobileRes);\nconst lhDesktop = extractLH(desktopRes);\n\nconst auditErrors = [];\nif (mobileRes && mobileRes.error) auditErrors.push('mobile: ' + (mobileRes.error.message || 'PSI error'));\nif (desktopRes && desktopRes.error) auditErrors.push('desktop: ' + (desktopRes.error.message || 'PSI error'));\nif (!prep.valid_url) auditErrors.push('No valid URL supplied');\n\n// If we have no lighthouse data at all -> inconclusive\nif (!lhMobile && !lhDesktop) {\n  return [{\n    json: {\n      lead_id: prep.lead_id,\n      business_name: prep.business_name,\n      final_url: prep.final_url,\n      platform: \"Inconclusive\",\n      audit_date: nowIso,\n      audit_status: 'inconclusive',\n      manual_review_required: true,\n      performance_score: null,\n      technical_score: null,\n      accessibility_score: null,\n      seo_score: null,\n      design_score: null,\n      conversion_score: null,\n      overall_score: null,\n      classification: \"INCONCLUSIVE\",\n      top_5_problems: [],\n      performance_findings: [],\n      technical_findings: [],\n      metrics: {},\n      audit_error: auditErrors.join('; ') || 'PageSpeed Insights returned no Lighthouse result',\n      retry_count: 0,\n      tool_versions: { pagespeed_insights: 'v5' },\n      audit_started_at: nowIso,\n      audit_completed_at: nowIso,\n    },\n  }];\n}\n\nconst primary = lhMobile || lhDesktop;\nfunction num(lh, id) {\n  const a = lh && lh.audits && lh.audits[id];\n  return a && typeof a.numericValue === 'number' ? a.numericValue : null;\n}\nfunction auditScore(lh, id) {\n  const a = lh && lh.audits && lh.audits[id];\n  return a && typeof a.score === 'number' ? a.score : null;\n}\nfunction catScore(lh, id) {\n  const c = lh && lh.categories && lh.categories[id];\n  return c && typeof c.score === 'number' ? c.score : null;\n}\nfunction requests(lh) {\n  const a = lh && lh.audits && lh.audits['network-requests'];\n  const items = a && a.details && a.details.items;\n  return Array.isArray(items) ? items.length : null;\n}\n\n// ---- Core metrics ----\nconst metrics = {\n  mobile: {\n    performance: catScore(lhMobile, 'performance'),\n    best_practices: catScore(lhMobile, 'best-practices'),\n    lcp_ms: num(lhMobile, 'largest-contentful-paint'),\n    cls: num(lhMobile, 'cumulative-layout-shift'),\n    tbt_ms: num(lhMobile, 'total-blocking-time'),\n    speed_index_ms: num(lhMobile, 'speed-index'),\n    fcp_ms: num(lhMobile, 'first-contentful-paint'),\n    tti_ms: num(lhMobile, 'interactive'),\n    total_byte_weight: num(lhMobile, 'total-byte-weight'),\n    request_count: requests(lhMobile),\n    viewport_ok: auditScore(lhMobile, 'viewport') === 1,\n    content_width_ok: auditScore(lhMobile, 'content-width') === 1,\n    is_https: auditScore(lhMobile, 'is-on-https') === 1,\n  },\n  desktop: {\n    performance: catScore(lhDesktop, 'performance'),\n    best_practices: catScore(lhDesktop, 'best-practices'),\n    lcp_ms: num(lhDesktop, 'largest-contentful-paint'),\n    cls: num(lhDesktop, 'cumulative-layout-shift'),\n    tbt_ms: num(lhDesktop, 'total-blocking-time'),\n    speed_index_ms: num(lhDesktop, 'speed-index'),\n    total_byte_weight: num(lhDesktop, 'total-byte-weight'),\n    request_count: requests(lhDesktop),\n  },\n};\n\n// ---- Evidence-backed findings helper ----\nconst perfFindings = [];\nconst techFindings = [];\nfunction fmtSec(ms) { return ms == null ? 'n/a' : (ms / 1000).toFixed(1) + ' s'; }\nfunction fmtMs(ms) { return ms == null ? 'n/a' : Math.round(ms) + ' ms'; }\nfunction fmtKb(b) { return b == null ? 'n/a' : Math.round(b / 1024) + ' KB'; }\n\nfunction addPerf(test, observed, expected, ok, severity, source, rec) {\n  if (ok) return;\n  perfFindings.push({ category: 'Performance', test, observed_value: observed, expected_threshold: expected, severity, evidence_source: source, recommendation: rec });\n}\nfunction addTech(test, observed, expected, ok, severity, source, rec) {\n  if (ok) return;\n  techFindings.push({ category: 'Technical Health', test, observed_value: observed, expected_threshold: expected, severity, evidence_source: source, recommendation: rec });\n}\n\nconst m = metrics.mobile;\n// Performance findings\naddPerf('Mobile LCP', fmtSec(m.lcp_ms), 'Target below ' + fmtSec(t.lcp_ms), m.lcp_ms == null || m.lcp_ms <= t.lcp_ms, m.lcp_ms > t.lcp_ms * 2 ? 'High' : 'Medium', 'Lighthouse mobile audit', 'Optimize images, reduce render-blocking resources and improve page delivery');\naddPerf('Cumulative Layout Shift', m.cls == null ? 'n/a' : m.cls.toFixed(2), 'Target below ' + t.cls, m.cls == null || m.cls <= t.cls, m.cls > t.cls * 2 ? 'High' : 'Medium', 'Lighthouse mobile audit', 'Set explicit width/height on media and reserve space for dynamic content');\naddPerf('Total Blocking Time', fmtMs(m.tbt_ms), 'Target below ' + fmtMs(t.tbt_ms), m.tbt_ms == null || m.tbt_ms <= t.tbt_ms, m.tbt_ms > t.tbt_ms * 3 ? 'High' : 'Medium', 'Lighthouse mobile audit', 'Reduce and defer JavaScript, split long tasks');\naddPerf('Speed Index', fmtSec(m.speed_index_ms), 'Target below ' + fmtSec(t.speed_index_ms), m.speed_index_ms == null || m.speed_index_ms <= t.speed_index_ms, 'Medium', 'Lighthouse mobile audit', 'Improve above-the-fold render speed and prioritize visible content');\naddPerf('Time to Interactive', fmtSec(m.tti_ms), 'Target below ' + fmtSec(t.tti_ms), m.tti_ms == null || m.tti_ms <= t.tti_ms, 'Medium', 'Lighthouse mobile audit', 'Reduce main-thread work and third-party script cost');\n\n// Page weight / resource findings\naddPerf('Total Page Weight', fmtKb(m.total_byte_weight), 'Target below ' + fmtKb(t.total_byte_weight), m.total_byte_weight == null || m.total_byte_weight <= t.total_byte_weight, m.total_byte_weight > t.total_byte_weight * 2 ? 'High' : 'Medium', 'Lighthouse network audit', 'Compress assets, remove unused code and lazy-load below-the-fold media');\naddPerf('Request Count', m.request_count == null ? 'n/a' : String(m.request_count) + ' requests', 'Target below ' + t.request_count, m.request_count == null || m.request_count <= t.request_count, 'Medium', 'Lighthouse network audit', 'Bundle assets and reduce the number of network requests');\n\n// Image optimization findings\nconst optImg = auditScore(primary, 'uses-optimized-images');\nconst modImg = auditScore(primary, 'modern-image-formats');\nconst respImg = auditScore(primary, 'uses-responsive-images');\naddPerf('Image Optimization', optImg === 1 ? 'Optimized' : 'Unoptimized images detected', 'Images efficiently encoded', optImg == null || optImg === 1, 'Medium', 'Lighthouse audit (uses-optimized-images)', 'Compress and properly encode images to reduce transfer size');\naddPerf('Modern Image Formats', modImg === 1 ? 'Modern formats used' : 'Legacy image formats detected', 'Serve WebP/AVIF where supported', modImg == null || modImg === 1, 'Low', 'Lighthouse audit (modern-image-formats)', 'Serve images in next-gen formats such as WebP or AVIF');\naddPerf('Responsive Images', respImg === 1 ? 'Appropriately sized' : 'Oversized images served', 'Serve appropriately sized images', respImg == null || respImg === 1, 'Low', 'Lighthouse audit (uses-responsive-images)', 'Serve images sized for the device viewport');\n\n// Mobile usability findings\naddPerf('Mobile Viewport', m.viewport_ok ? 'Configured' : 'Missing/invalid viewport', 'Responsive viewport meta present', m.viewport_ok, 'High', 'Lighthouse mobile audit (viewport)', 'Add a responsive viewport meta tag');\naddPerf('Content Width (horizontal overflow)', m.content_width_ok ? 'Fits viewport' : 'Content wider than screen', 'Content sized to viewport', m.content_width_ok, 'Medium', 'Lighthouse mobile audit (content-width)', 'Fix layout so content does not overflow horizontally on mobile');\n\n// ---- Technical health findings ----\nconst httpsOk = m.is_https || auditScore(lhDesktop, 'is-on-https') === 1;\naddTech('HTTPS', httpsOk ? 'Enabled' : 'Not served over HTTPS', 'Site served over HTTPS', httpsOk, 'High', 'Lighthouse audit (is-on-https)', 'Install a valid TLS certificate and force HTTPS redirects');\nconst consoleOk = auditScore(primary, 'errors-in-console');\naddTech('Console Errors', consoleOk === 1 ? 'None' : 'Console errors logged', 'No browser console errors', consoleOk == null || consoleOk === 1, 'Medium', 'Lighthouse audit (errors-in-console)', 'Fix JavaScript errors reported in the browser console');\nconst compOk = auditScore(primary, 'uses-text-compression');\naddTech('Text Compression', compOk === 1 ? 'Enabled' : 'Uncompressed text assets', 'Gzip/Brotli enabled', compOk == null || compOk === 1, 'Low', 'Lighthouse audit (uses-text-compression)', 'Enable Gzip or Brotli compression for text assets');\nconst bpMobile = metrics.mobile.best_practices;\naddTech('Best Practices Score', bpMobile == null ? 'n/a' : Math.round(bpMobile * 100) + '/100', 'Target 90+/100', bpMobile == null || bpMobile >= 0.9, bpMobile != null && bpMobile < 0.7 ? 'High' : 'Medium', 'Lighthouse best-practices category', 'Address flagged best-practice issues (security, deprecations, errors)');\n\n\n\n/// Function to calculate score directly from Lighthouse Audits or Numeric Values\nfunction calculatePerfFromAudits(lh) {\n  if (!lh || !lh.audits) return null;\n\n  // 1. Pehle Try Karein Direct Score Property (0 se 1)\n  const lcpScore = lh.audits['largest-contentful-paint']?.score;\n  const tbtScore = lh.audits['total-blocking-time']?.score;\n  const clsScore = lh.audits['cumulative-layout-shift']?.score;\n  const speedIndexScore = lh.audits['speed-index']?.score;\n  const fcpScore = lh.audits['first-contentful-paint']?.score;\n\n  const validScores = [lcpScore, tbtScore, clsScore, speedIndexScore, fcpScore].filter(\n    (s) => typeof s === 'number'\n  );\n\n  if (validScores.length > 0) {\n    return validScores.reduce((a, b) => a + b, 0) / validScores.length;\n  }\n\n  // 2. Fallback: Agar score null ho, toh numericValue (ms/unit) se score Estimate karein\n  const lcpMs = lh.audits['largest-contentful-paint']?.numericValue;\n  const tbtMs = lh.audits['total-blocking-time']?.numericValue;\n  const cls = lh.audits['cumulative-layout-shift']?.numericValue;\n\n  let estimatedScores = [];\n\n  if (typeof lcpMs === 'number') {\n    // LCP <= 2500ms (Good = 1.0), >= 4000ms (Poor = 0.3)\n    estimatedScores.push(lcpMs <= 2500 ? 0.95 : lcpMs <= 4000 ? 0.65 : 0.25);\n  }\n  if (typeof tbtMs === 'number') {\n    // TBT <= 200ms (Good = 1.0), >= 600ms (Poor = 0.3)\n    estimatedScores.push(tbtMs <= 200 ? 0.95 : tbtMs <= 600 ? 0.65 : 0.25);\n  }\n  if (typeof cls === 'number') {\n    // CLS <= 0.1 (Good = 1.0), >= 0.25 (Poor = 0.3)\n    estimatedScores.push(cls <= 0.1 ? 0.95 : cls <= 0.25 ? 0.65 : 0.25);\n  }\n\n  if (estimatedScores.length > 0) {\n    return estimatedScores.reduce((a, b) => a + b, 0) / estimatedScores.length;\n  }\n\n  return null;\n}\n\n// 1. Pehle Direct Category Score Check Karein\nlet pmRaw = lhMobile?.categories?.performance?.score ?? null;\nlet pdRaw = lhDesktop?.categories?.performance?.score ?? null;\n\n// 2. Agar Category Score NULL ho, toh Audits se Calculate Karein\nif (pmRaw === null) pmRaw = calculatePerfFromAudits(lhMobile);\nif (pdRaw === null) pdRaw = calculatePerfFromAudits(lhDesktop);\n\n// 3. Last Line Fallback: Agar phir bhi NULL ho, toh baki accurate scores ka average lein\nlet performance_score= null;\n\nif (pmRaw !== null && pdRaw !== null) {\n  performance_score = Math.round((pmRaw * 0.6 + pdRaw * 0.4) * 100);\n} else if (pmRaw !== null) {\n  performance_score = Math.round(pmRaw * 100);\n} else if (pdRaw !== null) {\n  performance_score = Math.round(pdRaw * 100);\n} else {\n  // Hard Fallback: Technical aur SEO score ka weighted estimate agar PSI Performance poori tarah drop karde\n  \n\n}\n// Technical health score: blend of best-practices + HTTPS/console/compression signals.\nconst techSignals = [];\nif (bpMobile != null) techSignals.push(bpMobile);\ntechSignals.push(httpsOk ? 1 : 0);\nif (consoleOk != null) techSignals.push(consoleOk);\nif (compOk != null) techSignals.push(compOk);\nlet technical_score = techSignals.length\n  ? Math.round((techSignals.reduce((a, b) => a + b, 0) / techSignals.length) * 100)\n  : null;\n\n// ==========================================\n// SCORING & LOGIC UPDATES\n// ==========================================\n\nconst accessibility_score = catScore(primary, 'accessibility') != null \n  ? Math.round(catScore(primary, 'accessibility') * 100) \n  : null;\n\nconst seo_score = catScore(primary, 'seo') != null \n  ? Math.round(catScore(primary, 'seo') * 100) \n  : null;\n\nfunction getPlatform(lh) {\n  const lib = lh && lh.audits && lh.audits['detected-javascript-libraries'];\n  const items = lib && lib.details && lib.details.items;\n  if (Array.isArray(items) && items.length > 0) {\n    return items.map(i => i.name).join(', ');\n  }\n  return 'Custom / Unknown';\n}\nconst platform = getPlatform(primary);\n\nlet design_score = 100;\nif (!metrics.mobile.viewport_ok) design_score -= 40;\nif (!metrics.mobile.content_width_ok) design_score -= 30;\nif (metrics.mobile.cls > 0.25) design_score -= 20;\nif (design_score < 0) design_score = 0;\n\nlet conversion_score = Math.round(((performance_score || 50) + (httpsOk ? 100 : 0)) / 2);\n\nconst scores = [performance_score, technical_score, accessibility_score, seo_score, design_score, conversion_score].filter(v => v != null);\n\nif (scores.length > 0) {\n    performance_score = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);\n  }\n\nconst overall_score = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;\n\nlet classification = 'POOR / CRITICAL';\nif (overall_score >= 80) classification = 'GOOD';\nelse if (overall_score >= 60) classification = 'NEEDS IMPROVEMENT';\n\nconst allFindings = [...perfFindings, ...techFindings];\nallFindings.sort((a, b) => (a.severity === 'High' ? -1 : 1));\nconst top_5_problems = allFindings.slice(0, 5).map(f => `${f.test}: ${f.observed_value} (${f.recommendation})`);\nconst audit_status = auditErrors.length && (!lhMobile || !lhDesktop) ? 'partial' : 'success';\n\nreturn [{\n  json: {\n    lead_id: prep.lead_id,\n    business_name: prep.business_name,\n    final_url: prep.final_url,\n    platform,\n    audit_date: nowIso,\n    audit_status,\n    performance_score,\n    technical_score,\n    accessibility_score,\n    seo_score,\n    design_score,\n    conversion_score,\n    overall_score,\n    classification,\n    top_5_problems,\n    metrics,\n    performance_findings: perfFindings,\n    technical_findings: techFindings,\n    findings_count: perfFindings.length + techFindings.length,\n    manual_review_required: audit_status !== 'success',\n    audit_error: auditErrors.join('; ') || null,\n    retry_count: 0,\n    tool_versions: {\n      pagespeed_insights: 'v5',\n      lighthouse: (primary && primary.lighthouseVersion) || null,\n    },\n    thresholds_used: t,\n    audit_started_at: nowIso,\n    audit_completed_at: nowIso,\n  },\n}];"
+      },
+      "id": "eb5c2504-2aad-4c78-be45-be2bba7ec4e1",
+      "name": "Build Performance Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1984,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1tY4vtz7rN7V84RSjPCh9So4k-jiYCh1j6v45EVqEpyo",
+          "mode": "list",
+          "cachedResultName": "Companies of north america",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tY4vtz7rN7V84RSjPCh9So4k-jiYCh1j6v45EVqEpyo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 366949032,
+          "mode": "list",
+          "cachedResultName": "data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tY4vtz7rN7V84RSjPCh9So4k-jiYCh1j6v45EVqEpyo/edit#gid=366949032"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        16,
+        368
+      ],
+      "id": "3ed8e910-9857-4897-980d-9183301a3f47",
+      "name": "Google Sheets Trigger",
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "LQXgeFiFURgHDvU3",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop through all incoming website items from the Google Sheet\nfor (const item of $input.all()) {\n  let rawUrl = item.json.url || \"\";\n  \n  // 1. URL Normalization (Adds https:// if missing and cleans spaces)\n  let cleanUrl = rawUrl.trim();\n  if (cleanUrl && !/^https?:\\/\\//i.test(cleanUrl)) {\n    cleanUrl = 'https://' + cleanUrl;\n  }\n  \n  // 2. Set default parameters for the rest of the team\n  item.json.original_website_url = rawUrl;\n  item.json.final_url = cleanUrl;\n  item.json.audit_status = \"Reachable\";\n  \n  // Note: Since standard JavaScript inside cloud n8n cannot launch a local browser,\n  // we use a standard placeholder name for the screenshot.\n  item.json.screenshot_url = \"website_screenshot.png\";\n  item.json.audit_error = null;\n}\n\n// Pass the updated data down the line to Fatima and Furqan\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        368
+      ],
+      "id": "c746505b-85f5-4438-a63f-efdcb986ec50",
+      "name": "Run Website Audit"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get input data from the previous node\nconst inputData = $input.first().json;\nconst url = inputData.url || inputData.business_url;\n\nif (!url) {\n  throw new Error(\"No URL available to process.\");\n}\n\nlet html = \"\";\ntry {\n  // Use n8n's internal httpRequest helper to fetch live website HTML safely\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: url,\n    returnFullResponse: true,\n    headers: {\n      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',\n      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'\n    }\n  });\n  \n  // Extract body content from response\n  html = typeof response.body === 'string' ? response.body : JSON.stringify(response.body);\n} catch (error) {\n  html = \"\";\n}\n\n// Parse real metadata elements from live HTML\nconst titleMatch = html.match(/<title[^>]*>([^<]+)<\\/title>/i);\nconst title = titleMatch ? titleMatch[1].trim() : null;\n\nconst metaDescMatch = html.match(/<meta\\s+name=[\"']description[\"']\\s+content=[\"']([^\"']+)[\"']/i);\nconst metaDescription = metaDescMatch ? metaDescMatch[1].trim() : null;\n\nconst h1Matches = html.match(/<h1[^>]*>.*?<\\/h1>/gis);\nconst h1Count = h1Matches ? h1Matches.length : 0;\n\nconst hasLocalBusinessSchema = /[\"']@type[\"']\\s*:\\s*[\"'](LocalBusiness|Organization|Store|Restaurant|Place)[\"']/i.test(html);\n\n// Parse real accessibility elements (image alt tags)\nconst imgTags = html.match(/<img[^>]*>/gis) || [];\nlet missingAltCount = 0;\nimgTags.forEach(img => {\n  if (!/alt\\s*=\\s*[\"'][^\"']+[\"']/i.test(img)) {\n    missingAltCount++;\n  }\n});\n\n// Calculate real audit scores\nlet seoScore = 100;\nif (!title) seoScore -= 35;\nif (!metaDescription) seoScore -= 35;\nif (h1Count === 0) seoScore -= 30;\n\nlet accessibilityScore = 100;\nif (imgTags.length > 0) {\n  accessibilityScore = Math.max(0, Math.round(100 - ((missingAltCount / imgTags.length) * 100)));\n}\n\nreturn [{\n  json: {\n    lead_id: inputData.lead_id || \"LEAD-101\",\n    business_name: inputData.business_name || \"Unknown Business\",\n    url: url,\n    seo_local: {\n      title: title,\n      meta_description: metaDescription,\n      h1_count: h1Count,\n      has_local_business_schema: hasLocalBusinessSchema\n    },\n    accessibility: {\n      total_images: imgTags.length,\n      images_missing_alt: missingAltCount\n    },\n    seo_score: Math.max(0, seoScore),\n    accessibility_score: accessibilityScore,\n    audit_status: html ? \"Parsed live page data\" : \"Blocked or failed to fetch live URL\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        368
+      ],
+      "id": "1c4d42eb-1210-4c09-a94b-16e714f3abe5",
+      "name": "Accessibility & SEO Audit"
+    },
+    {
+      "parameters": {
+        "url": "https://api.microlink.io",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json.final_url }}"
+            },
+            {
+              "name": "screenshot",
+              "value": "true"
+            },
+            {
+              "name": "screenshot.fullpage",
+              "value": "true"
+            },
+            {
+              "name": "screenshot.waitFor",
+              "value": "3000"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2208,
+        368
+      ],
+      "id": "74bea3ee-b0c9-4ea9-919e-c77c9d298bd5",
+      "name": "HTTP Request",
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1tY4vtz7rN7V84RSjPCh9So4k-jiYCh1j6v45EVqEpyo",
+          "mode": "list",
+          "cachedResultName": "Companies of north america",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tY4vtz7rN7V84RSjPCh9So4k-jiYCh1j6v45EVqEpyo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 366949032,
+          "mode": "list",
+          "cachedResultName": "data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tY4vtz7rN7V84RSjPCh9So4k-jiYCh1j6v45EVqEpyo/edit#gid=366949032"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "lead_id": "={{ $('Build Performance Report').item.json.lead_id }}",
+            "business_name": "={{ $('Build Performance Report').item.json.business_name }}",
+            "final_url": "={{ $('Build Performance Report').item.json.final_url }}",
+            "platform": "={{ $('Build Performance Report').item.json.platform }}",
+            "performance_score": "={{ $('Build Performance Report').item.json.performance_score }}",
+            "accessibility_score": "={{ $('Accessibility & SEO Audit').item.json.accessibility_score }}",
+            "seo_score": "={{ $('Accessibility & SEO Audit').item.json.seo_score }}",
+            "design_score": "={{ $('Build Performance Report').item.json.design_score }}",
+            "conversion_score": "={{ $('Build Performance Report').item.json.conversion_score }}",
+            "overall_score": "={{ $('Build Performance Report').item.json.overall_score }}",
+            "classification": "={{ $('Build Performance Report').item.json.classification }}",
+            "website_url": "={{ $('Build Performance Report').item.json.final_url }}",
+            "top_5_problems": "={{ $('Build Performance Report').item.json.top_5_problems }}",
+            "screen_url": "={{ $json.data.screenshot.url }}",
+            "technical_score": "={{ $('Build Performance Report').item.json.technical_score }}"
+          },
+          "matchingColumns": [
+            "lead_id"
+          ],
+          "schema": [
+            {
+              "id": "lead_id",
+              "displayName": "lead_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "business_name",
+              "displayName": "business_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "city",
+              "displayName": "city",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "address",
+              "displayName": "address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "final_url",
+              "displayName": "final_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "platform",
+              "displayName": "platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "technical_score",
+              "displayName": "technical_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "performance_score",
+              "displayName": "performance_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "accessibility_score",
+              "displayName": "accessibility_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "seo_score",
+              "displayName": "seo_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "design_score",
+              "displayName": "design_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "conversion_score",
+              "displayName": "conversion_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "overall_score",
+              "displayName": "overall_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "classification",
+              "displayName": "classification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "top_5_problems",
+              "displayName": "top_5_problems",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "screen_url",
+              "displayName": "screen_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "website_url",
+              "displayName": "website_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2432,
+        368
+      ],
+      "id": "107b2efa-6174-4b54-81fe-dfff56a71bd9",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "aaPzvRnAITZqBSvX",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f67e6ee6-2c61-44bb-8e54-d1de78e8537c",
+              "leftValue": "={{ $json.final_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        432,
+        368
+      ],
+      "id": "75827488-4b6c-4342-bf80-83931bf6324e",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "44125bd0-9b0a-4a3a-87ff-19bfd683bc9f",
+              "leftValue": "={{ $json.url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        368
+      ],
+      "id": "0936e57d-9ff5-4102-b869-df9b98e876e2",
+      "name": "Filter1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        640,
+        368
+      ],
+      "id": "eb760532-a458-4c8c-8723-0a32dd9beb9f",
+      "name": "Wait",
+      "webhookId": "3ba24dbe-fa59-44c3-9fa0-92662089d933"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Prepare & Config": {
+      "main": [
+        [
+          {
+            "node": "Run Website Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PSI Mobile": {
+      "main": [
+        [
+          {
+            "node": "Merge Strategies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Strategies": {
+      "main": [
+        [
+          {
+            "node": "Build Performance Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PSI Desktop": {
+      "main": [
+        [
+          {
+            "node": "Merge Strategies",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Build Performance Report": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Filter1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Website Audit": {
+      "main": [
+        [
+          {
+            "node": "Accessibility & SEO Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accessibility & SEO Audit": {
+      "main": [
+        [
+          {
+            "node": "PSI Mobile",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PSI Desktop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        []
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter1": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Prepare & Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f90395df-28a2-4bbc-8df4-71fb04e82ac0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7b306457276a81e33e9c2d7bd74063f36caaef0e7cf8611eee8b3332bb2dd71e"
+  },
+  "nodeGroups": [],
+  "id": "vDPuTKxUiNmIZNyG",
+  "tags": []
+}
